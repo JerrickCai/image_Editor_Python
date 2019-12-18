@@ -17,14 +17,13 @@ class myGUI(object):
         self.canvas = Canvas(width=canvasW, height=canvasH, bg='gray')
         self.canvas.pack(fill='both', expand='yes')
 
+        #setting default imgae
         path = 'default.jpg'
-        img = cv2.imread(path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        print(img.shape)
-        img = self.checkSize(img)
-        print(img.shape)
-        self.photo = ImageTk.PhotoImage(image=Image.fromarray(img))
-        self.img = self.canvas.create_image(canvasH/2, canvasW/2, anchor='center', image=self.photo)
+        self.OriginImg = cv2.imread(path)#origin image keeps the origin size and image information
+        self.OriginImg = cv2.cvtColor(self.OriginImg, cv2.COLOR_BGR2RGB)
+        self.img = self.checkSize(self.OriginImg)#img is the resized image
+        self.photo = ImageTk.PhotoImage(image=Image.fromarray(self.img))
+        self.canvasImg = self.canvas.create_image(canvasH/2, canvasW/2, anchor='center', image=self.photo)
 
         self.text = StringVar()
         # create frame to put control buttons onto
@@ -43,18 +42,30 @@ class myGUI(object):
         self.importImageButton = Button(self.frameBottom , text="import image", command=self.importImg)
         self.importImageButton.pack(side='left', padx=10)
 
+        # create save image button
+        self.exportImageButton = Button(self.frameBottom, text="save as", command=self.exportImg)
+        self.exportImageButton.pack(side='left', padx=10)
+
         self.root.mainloop()
         # self.root.destroy()
 
+    #read image from disk
     def importImg(self):
         path = filedialog.askopenfilename()
-        img = cv2.imread(path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = self.checkSize(img)
-        self.photo = ImageTk.PhotoImage(image=Image.fromarray(img))
-        self.canvas.itemconfig(self.img, image=self.photo)
+        self.OriginImg = cv2.imread(path)
+        self.OriginImg = cv2.cvtColor(self.OriginImg, cv2.COLOR_BGR2RGB)
+        self.img = self.checkSize(self.OriginImg)
+        self.photo = ImageTk.PhotoImage(image=Image.fromarray(self.img))
+        self.canvas.itemconfig(self.canvasImg, image=self.photo)
         self.text.set('imported')
 
+    # save image to disk
+    def exportImg(self):
+        path = filedialog.asksaveasfilename()
+        Image.fromarray(self.OriginImg).save(path)
+        self.text.set('saved')
+
+    #resize imgae according the ratio of image
     def checkSize(self,img):
         h, w = img.shape[:2]
         ratio1 = h/w
