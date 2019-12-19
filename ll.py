@@ -1,8 +1,7 @@
 from tkinter import filedialog
-import cv2
 import numpy as np
 from tkinter import *
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageEnhance
 
 class myGUI(object):
     def __init__(self):
@@ -18,22 +17,24 @@ class myGUI(object):
         self.canvas.pack(fill='both', expand='no')
 
         #default parameters
-        self.scale = 1
+        self.zoomScale = 1
 
         #setting default imgae
         path = 'default.jpg'
-        self.originImg = cv2.imread(path)#origin image keeps the origin size and image information
-        self.originImg = cv2.cvtColor(self.originImg, cv2.COLOR_BGR2RGB)
+        self.originImg = Image.open(path)#origin image keeps the origin size and image information
         self.modifiedOriginImg = self.originImg #for saving file
         self.checkSize(self.originImg)#img is the resized image
-        self.displayedImgOrigin = self.displayedImg #make a copy of the very first resized to window sized image, to keep a clear and sharp preview image
-        self.photo = ImageTk.PhotoImage(image=Image.fromarray(self.displayedImg))
+        self.photo = ImageTk.PhotoImage(image=self.displayedImg)
         self.canvasImg = self.canvas.create_image(self.canvasH/2, self.canvasW/2, anchor='center', image=self.photo)
 
         self.text = StringVar()
         # create frame to put control buttons onto
         self.frameBottom = Frame(self.root, width=800, height=50)
         self.frameBottom.pack(fill='both', expand='yes')
+
+        # create frame to put scales
+        self.frameScales = Frame(self.root, width=800, height=50)
+        self.frameScales.pack(fill='both', expand='yes')
 
         # create frame to put status bar onto
         self.frameStatus = Frame(self.root, width=800, height=50)
@@ -75,63 +76,90 @@ class myGUI(object):
         self.rotationButton = Button(self.frameBottom, text="rotate", command=self.rotation)
         self.rotationButton.pack(side='left', padx=10)
 
+        # create scale of brightness
+        self.brightnessScale = Scale(self.frameScales, label='Brightness', from_=0, to=2, orient=HORIZONTAL,
+                     length=200, showvalue=1, tickinterval=0.3, resolution=0.1, command=self.brightnessSetScale)
+        self.brightnessScale.pack(side='left', padx=10)
+
+        # create brightness button
+        self.brightnessButton = Button(self.frameScales, text=" adjust Brightness", command=self.brightnessSelection)
+        self.brightnessButton.pack(side='left', padx=10)
+
         self.root.mainloop()
-        # self.root.destroy()
 
     # set image to canvas
     def setImg(self):
-        self.photo = ImageTk.PhotoImage(image=Image.fromarray(self.displayedImg))
+        self.photo = ImageTk.PhotoImage(image=self.displayedImg)
         self.canvas.itemconfig(self.canvasImg, image=self.photo)
 
     #read image from disk
     def importImg(self):
         path = filedialog.askopenfilename()
-        self.originImg = cv2.imread(path)
-        self.originImg = cv2.cvtColor(self.originImg, cv2.COLOR_BGR2RGB)
+        self.originImg = Image.open(path)
         self.checkSize(self.originImg)
         self.setImg()
         self.displayedImgOrigin = self.displayedImg
         self.modifiedOriginImg = self.originImg
+        self.reset()
         self.text.set('imported')
 
     # save image to disk
     def exportImg(self):
         path = filedialog.asksaveasfilename()
-        Image.fromarray(self.modifiedOriginImg).save(path)
+        self.modifiedOriginImg.save(path)
         self.text.set('saved')
 
     # zoom in and zoom out
     def zoom(self, step):
-        self.scale += step #ositive step is zoom in, O.W. zoom out
-        # h, w = self.copiedOriginImg.shape[:2]
-        # self.modifiedOriginImg = cv2.resize(self.copiedOriginImg, (int(w*self.scale), int(h*self.scale)))
-        h, w = self.displayedImgOrigin.shape[:2]
-        self.displayedImg = cv2.resize(self.displayedImgOrigin, (int(w*self.scale), int(h*self.scale)))
+        self.zoomScale += step #ositive step is zoom in, O.W. zoom out
+        h, w = self.displayedImgOrigin.size
+        self.displayedImg = self.displayedImgOrigin.resize( (int(w*self.zoomScale), int(h*self.zoomScale)))
         self.setImg()
         self.text.set('zoomed in')
 
     # flip Horizontally and flip Vertically
     def flip(self, direction):
-        self.modifiedOriginImg = cv2.flip(self.modifiedOriginImg, direction)#direction=0 is H, 1 is Vertically
-        self.displayedImgOrigin = cv2.flip(self.displayedImgOrigin, direction)
+        if direction == 0:
+            self.modifiedOriginImg = self.modifiedOriginImg.transpose(Image.FLIP_LEFT_RIGHT)#direction=0 is H, 1 is Vertically
+            self.displayedImgOrigin = self.displayedImgOrigin.transpose(Image.FLIP_LEFT_RIGHT)
+        else:
+            self.modifiedOriginImg = self.modifiedOriginImg.transpose(
+                Image.FLIP_TOP_BOTTOM)
+            self.displayedImgOrigin = self.displayedImgOrigin.transpose(Image.FLIP_TOP_BOTTOM)
         self.zoom(0)
         self.text.set('flipped')
 
+    # rotation
     def rotation(self):
-        h, w = self.modifiedOriginImg.shape[:2]
-        M = cv2.getRotationMatrix2D((w/2, h/2), 90, 1)
-        self.modifiedOriginImg = cv2.warpAffine(self.modifiedOriginImg, M, (h, w))
+        self.modifiedOriginImg = self.modifiedOriginImg.transpose(Image.ROTATE_90)
 
-        h, w = self.displayedImgOrigin.shape[:2]
-        M = cv2.getRotationMatrix2D((self.canvasW/2, self.canvasH/2), 90, 1)
-        self.displayedImgOrigin = cv2.warpAffine(self.displayedImgOrigin, M, (h, w))
+        self.displayedImgOrigin = self.displayedImgOrigin.transpose(Image.ROTATE_90)
         self.zoom(0)
         self.text.set('rotated')
+
+    #brightness
+    def brightnessSetScale(self, scale):
+        self.scale = scale
+        print(self.scale )
+
+    #brightness
+    def brightnessSelection(self):
+        # image brightness enhancer
+        enhancer = ImageEnhance.Brightness(self.modifiedOriginImg)
+        factor = float(self.scale)  # darkens the image
+        self.modifiedOriginImg = enhancer.enhance(factor)
+
+        enhancer = ImageEnhance.Brightness(self.displayedImgOrigin)
+        factor = float(self.scale)  # darkens the image
+        self.displayedImgOrigin = enhancer.enhance(factor)
+
+        self.zoom(0)
+        self.text.set('has set brightness')
 
     # reset
     def reset(self):
         #parameter back to default
-        self.scale = 1
+        self.zoomScale = 1
 
         # image back to default
         self.modifiedOriginImg = self.originImg
@@ -144,17 +172,19 @@ class myGUI(object):
 
     #resize image according the ratio of image
     def checkSize(self, img):
-        h, w = img.shape[:2]
+        h, w = img.size
         ratio1 = h/w
         ratio2 = w/h
         self.root.update()
         canvasWidth = self.canvas.winfo_width()
         canvasHeight = self.canvas.winfo_height()
         if h>w:
-            self.displayedImg = cv2.resize(img, (int(canvasHeight*ratio2), canvasHeight))
+            self.displayedImg = img.resize((int(canvasHeight*ratio2), canvasHeight))
         else:
-            self.displayedImg = cv2.resize(img, (canvasWidth, int(canvasWidth*ratio1)))
-        self.displayedImgOrigin = self.displayedImg
+            self.displayedImg = img.resize((canvasWidth, int(canvasWidth*ratio1)))
+        self.displayedImgOrigin = self.displayedImg #make a copy of the very first resized to window sized image, to keep a clear and sharp preview image
+        h, w = self.displayedImgOrigin.size
+        self.displayedImg = self.displayedImgOrigin.resize((int(w * self.zoomScale), int(h * self.zoomScale)))
 
 if __name__ == "__main__":
     gui = myGUI()
