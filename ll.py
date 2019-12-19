@@ -137,10 +137,9 @@ class myGUI(object):
         self.zoom(0)
         self.text.set('rotated')
 
-    #brightness
+    #set brightness scale
     def brightnessSetScale(self, scale):
         self.scale = scale
-        print(self.scale )
 
     #brightness
     def brightnessSelection(self):
